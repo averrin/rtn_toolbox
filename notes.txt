@@ -1,0 +1,6 @@
+dcFlush()
+controllerHideAll()
+startApp("pvr")
+fullRestart()
+
+TVLib.Event.sendControllerRestart({})
