@@ -5,5 +5,5 @@ fullRestart()
 
 TVLib.Event.sendControllerRestart({})
 
-????????? ?????????: https://confluence.developonbox.ru/display/OGEIF/STB+DC+algorithms
-???????? ??????? ???????: https://confluence.developonbox.ru/pages/viewpage.action?pageId=14221595
+Алгоритмы аггрегации: https://confluence.developonbox.ru/display/OGEIF/STB+DC+algorithms
+Параметры событий: https://confluence.developonbox.ru/pages/viewpage.action?pageId=14221595
