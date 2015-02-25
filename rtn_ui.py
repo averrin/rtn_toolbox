@@ -87,6 +87,7 @@ class ConsoleThread(QThread):
                 sys.stdout.flush()
                 time.sleep(0.3)
                 sys.stdout.write('\b' * (len(ws) + 5))
+        print('Connected!')
 
     def run(self):
         self.consoleServer.serve_forever()
@@ -267,8 +268,20 @@ class RTN(QMainWindow):
         bpanel.layout().addWidget(remove_button)
         bpanel.layout().addWidget(openlog_button)
         bpanel.layout().addWidget(openinject_button)
+
+        bpanel.layout().addWidget(QLabel("Log details"))
         self.bfs_check = QCheckBox('Show BFS')
         bpanel.layout().addWidget(self.bfs_check)
+
+        self.rtnui_check = QCheckBox('Show RTNUI')
+        self.rtnui_check.stateChanged.connect(self.rtn_toggle)
+        bpanel.layout().addWidget(self.rtnui_check)
+
+        self.zfwk_check = QCheckBox('Show ZFWK')
+        self.zfwk_check.stateChanged.connect(self.zfwk_toggle)
+        bpanel.layout().addWidget(self.zfwk_check)
+
+
         bpanel.layout().addSpacerItem(QSpacerItem(20,40,QSizePolicy.Minimum,QSizePolicy.Expanding))
         # self.workThread.start()
 
@@ -280,6 +293,21 @@ class RTN(QMainWindow):
         # completer.setFilterMode(Qt.MatchContains)
         self.consoleInput.setCompleter(self.completer)
         self.consoleInput2.setCompleter(self.completer)
+
+    def rtn_toggle(self):
+        event = {"color": "white", "attrs": [], "check": lambda p, t, l: "RTNUI" in l, "name": "rtnui"}
+        if self.rtnui_check.checkState() == Qt.Checked:
+            color_pref.append(event)
+        else:
+            color_pref.remove(filter(lambda x: x['name'] == 'rtnui', color_pref)[0])
+
+    def zfwk_toggle(self):
+        event = {"color": "white", "attrs": [], "check": lambda p, t, l: p == '[ZFWK]', "name": "zfwk"}
+        if self.zfwk_check.checkState() == Qt.Checked:
+            color_pref.append(event)
+        else:
+            color_pref.remove(filter(lambda x: x['name'] == 'zfwk', color_pref)[0])
+
 
     def saveNotes(self):
         t = self.notes_widget.toPlainText()
@@ -380,6 +408,7 @@ class RTN(QMainWindow):
         message = str(message)
         msg = json.loads(message)
         if isinstance(msg['data'], dict):
+            print(msg['data'])
             return
         log = msg['data'].strip()
 
