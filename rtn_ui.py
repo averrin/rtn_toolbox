@@ -50,8 +50,7 @@ class BfsThread(QThread):
         QThread.__init__(self)
 
     def run(self):
-        path = '/home/user/.wine/drive_c/Cisco-SDK/downloads/bfs'
-        cmd = ["inotifywait", "-m", "-r", path, "--timefmt", "%d-%m-%Y", "--format", "'%T -- %w -- %f -- %e'"]
+        cmd = ["inotifywait", "-m", "-r", BFS_PATH, "--timefmt", "%d-%m-%Y", "--format", "'%T -- %w -- %f -- %e'"]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         while 1:
             line = p.stdout.readline()
@@ -268,6 +267,8 @@ class RTN(QMainWindow):
         bpanel.layout().addWidget(remove_button)
         bpanel.layout().addWidget(openlog_button)
         bpanel.layout().addWidget(openinject_button)
+        self.bfs_check = QCheckBox('Show BFS')
+        bpanel.layout().addWidget(self.bfs_check)
         bpanel.layout().addSpacerItem(QSpacerItem(20,40,QSizePolicy.Minimum,QSizePolicy.Expanding))
         # self.workThread.start()
 
@@ -315,7 +316,7 @@ class RTN(QMainWindow):
         else:
             if cmd not in self.history:
                 self.history.append(cmd)
-                # self.completer.setModel(self.history)
+                self.completer.setModel(QStringListModel(self.history))
             self.q.append(cmd)
 
     def consoleInputHandler2(self):
@@ -328,7 +329,7 @@ class RTN(QMainWindow):
         else:
             if cmd not in self.history:
                 self.history.append(cmd)
-                # self.completer.setModel(self.history)
+                self.completer.setModel(QStringListModel(self.history))
             self.q_zfwk.append(cmd)
 
     def bfsHandler(self, msg):
@@ -336,9 +337,9 @@ class RTN(QMainWindow):
         ts, folder, filename, event = msg.replace("'", '').split(' -- ')
         if 'ISDIR' in event or 'CLOSE' in event:
             return
-        bfs_path = '/home/user/.wine/drive_c/Cisco-SDK/downloads/bfs'
-        path = os.path.join(folder, filename)[len(bfs_path):]
-        self.message(colored("BFS: %s -- %s" % (event, path), "pink"))
+        path = os.path.join(folder, filename)[len(BFS_PATH):]
+        if self.bfs_check.checkState() == Qt.Checked:
+            self.message(colored("BFS: %s -- %s" % (event, path), "pink"))
 
     def message(self, msg):
         if len(msg) > 300:

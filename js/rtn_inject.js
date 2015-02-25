@@ -16,7 +16,8 @@ function startApp(app){
 }
 
 function handleEvent(event){
-  dir("event", event);
+  log("Event in controller:")
+  dir("event", event.data);
 }
 
 function log(msg) {

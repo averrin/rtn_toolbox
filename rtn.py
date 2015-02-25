@@ -13,6 +13,8 @@ logging.basicConfig(filename=os.path.join(CWD, 'rtn_log.log'), level=logging.DEB
 import time
 from rtn_rules import *
 
+BFS_PATH = '/home/user/.wine/drive_c/Cisco-SDK/downloads/bfs'
+
 def spinning_cursor():
     while True:
         for cursor in u'▁▃▄▅▆▇█▇▆▅▄▃':
