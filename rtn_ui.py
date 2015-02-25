@@ -191,7 +191,7 @@ class RTN(QMainWindow):
         self.consoleThread.start()
 
         self.notes_widget = QTextEdit()
-        self.notes_widget.setText(file(os.path.join(CWD, "notes.txt"), 'r').read().encode("utf8"))
+        self.notes_widget.setText(file(os.path.join(CWD, "notes.txt"), 'r').read().decode("utf8"))
         self.notes_widget.textChanged.connect(self.saveNotes)
 
         console_widget = QWidget()
@@ -310,7 +310,7 @@ class RTN(QMainWindow):
 
 
     def saveNotes(self):
-        t = self.notes_widget.toPlainText()
+        t = self.notes_widget.toPlainText().toUtf8()
         file(os.path.join(CWD, "notes.txt"), 'w').write(t)
 
     def clearLogs(self):
