@@ -5,6 +5,7 @@ import sys
 import time
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
+from PyQt4.QtWebKit import QWebView
 from rtn import *
 import subprocess
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
@@ -43,6 +44,20 @@ class WorkThread(QThread):
 
     def handler(self, *args):
         self.emit(SIGNAL("update(QString)"), QString(args[1]))
+
+class BfsThread(QThread):
+    def __init__(self):
+        QThread.__init__(self)
+
+    def run(self):
+        path = '/home/user/.wine/drive_c/Cisco-SDK/downloads/bfs'
+        cmd = ["inotifywait", "-m", "-r", path, "--timefmt", "%d-%m-%Y", "--format", "'%T -- %w -- %f -- %e'"]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        while 1:
+            line = p.stdout.readline()
+            self.emit(SIGNAL("update(QString)"), QString(line))
+            if not line:
+                break
 
 class LogThread(QThread):
     def __init__(self):
@@ -152,6 +167,10 @@ class RTN(QMainWindow):
         self.connect( self.logThread, SIGNAL("update(QString)"), self.fullogHandler )
         self.logThread.start()
 
+        self.BfsThread = BfsThread()
+        self.connect( self.BfsThread, SIGNAL("update(QString)"), self.bfsHandler )
+        self.BfsThread.start()
+
         self.history = json.load(file(os.path.join(CWD, 'history.txt'), 'r'))
         self.logView = QTextBrowser()
         self.fullogView = QTextBrowser()
@@ -172,7 +191,7 @@ class RTN(QMainWindow):
         self.consoleThread.start()
 
         self.notes_widget = QTextEdit()
-        self.notes_widget.setText(file(os.path.join(CWD, "notes.txt"), 'r').read())
+        self.notes_widget.setText(file(os.path.join(CWD, "notes.txt"), 'r').read().encode("utf8"))
         self.notes_widget.textChanged.connect(self.saveNotes)
 
         console_widget = QWidget()
@@ -201,15 +220,21 @@ class RTN(QMainWindow):
         dock.setWidget(console_tabs)
         self.addDockWidget(Qt.BottomDockWidgetArea, dock)
 
+        self.parserView = QWebView()
+        self.parserView.setUrl(QUrl(os.path.join(CWD, 'dc_parser/DCParser.html')))
+
         tabs = QTabWidget()
         tabs.addTab(self.logView, 'Log')
         tabs.addTab(self.fullogView, 'Full log')
+        tabs.addTab(self.parserView, 'DC Parser')
         # tabs.addTab(console_widget, 'JS Console')
 
         start_button = QPushButton('Start')
         start_button.clicked.connect(self.workThread.start)
         restart_button = QPushButton('Restart')
         restart_button.clicked.connect(self.restartGalio)
+        crestart_button = QPushButton('Clear && Restart')
+        crestart_button.clicked.connect(self.clear_restart)
         stop_button = QPushButton('Stop')
         stop_button.clicked.connect(stopGalio)
         widget.setLayout(QHBoxLayout())
@@ -234,6 +259,7 @@ class RTN(QMainWindow):
         bpanel.layout().addWidget(QLabel("Galio controls"))
         bpanel.layout().addWidget(start_button)
         bpanel.layout().addWidget(restart_button)
+        bpanel.layout().addWidget(crestart_button)
         bpanel.layout().addWidget(stop_button)
         bpanel.layout().addWidget(QLabel("Other utils"))
         bpanel.layout().addWidget(rules_button)
@@ -248,11 +274,11 @@ class RTN(QMainWindow):
         QShortcut(QKeySequence("Ctrl+R"), self, self.restartGalio)
         QShortcut(QKeySequence("Ctrl+X"), self, self.clearLogs)
 
-        completer = QCompleter(self.history)
-        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.completer = QCompleter(self.history)
+        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         # completer.setFilterMode(Qt.MatchContains)
-        self.consoleInput.setCompleter(completer)
-        self.consoleInput2.setCompleter(completer)
+        self.consoleInput.setCompleter(self.completer)
+        self.consoleInput2.setCompleter(self.completer)
 
     def saveNotes(self):
         t = self.notes_widget.toPlainText()
@@ -271,7 +297,7 @@ class RTN(QMainWindow):
         subprocess.Popen(['subl', os.path.join(CWD, 'rtn_rules.py')])
 
     def removeLog(self):
-        subprocess.Popen(['rm', os.path.join(CWD, 'rtn_log.log')])
+        open(os.path.join(CWD, 'rtn_log.log'), 'w').write("")
 
     def openLog(self):
         subprocess.Popen(['subl', os.path.join(CWD, 'rtn_log.log')])
@@ -287,11 +313,10 @@ class RTN(QMainWindow):
         if cmd == 'clear':
             self.consoleView.clear()
         else:
-            self.history.append(cmd)
+            if cmd not in self.history:
+                self.history.append(cmd)
+                # self.completer.setModel(self.history)
             self.q.append(cmd)
-            completer = QCompleter(self.history)
-            completer.setCaseSensitivity(Qt.CaseInsensitive)
-            self.consoleInput.setCompleter(completer)
 
     def consoleInputHandler2(self):
         cmd = self.consoleInput2.text()
@@ -301,13 +326,23 @@ class RTN(QMainWindow):
         if cmd == 'clear':
             self.consoleView2.clear()
         else:
-            self.history.append(cmd)
+            if cmd not in self.history:
+                self.history.append(cmd)
+                # self.completer.setModel(self.history)
             self.q_zfwk.append(cmd)
-            completer = QCompleter(self.history)
-            completer.setCaseSensitivity(Qt.CaseInsensitive)
-            self.consoleInput2.setCompleter(completer)
+
+    def bfsHandler(self, msg):
+        msg = str(msg).strip()
+        ts, folder, filename, event = msg.replace("'", '').split(' -- ')
+        if 'ISDIR' in event or 'CLOSE' in event:
+            return
+        bfs_path = '/home/user/.wine/drive_c/Cisco-SDK/downloads/bfs'
+        path = os.path.join(folder, filename)[len(bfs_path):]
+        self.message(colored("BFS: %s -- %s" % (event, path), "pink"))
 
     def message(self, msg):
+        if len(msg) > 300:
+            msg = msg[:300] + '...'
         self.logView.append(msg)
         self.logView.verticalScrollBar().setValue(self.logView.verticalScrollBar().maximum())
 
@@ -324,6 +359,14 @@ class RTN(QMainWindow):
         else:
             self.consoleView2.append(msg)
             self.consoleView2.verticalScrollBar().setValue(self.consoleView2.verticalScrollBar().maximum())
+
+    def clear_restart(self):
+        self.clearLogs()
+        self.removeLog()
+        self.logThread = LogThread()
+        self.connect( self.logThread, SIGNAL("update(QString)"), self.fullogHandler )
+        self.logThread.start()
+        self.restartGalio()
 
     def restartGalio(self):
         self.consoleView2.clear()

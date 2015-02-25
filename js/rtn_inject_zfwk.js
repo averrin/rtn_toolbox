@@ -73,6 +73,14 @@ function callAjax(url, callback) {
   // log("waiting for command...");
   var timeout = setTimeout( function(){ xmlhttp.abort(); waitCmd(); }, 1000);
 }
+
+function get(url){
+  p = new XMLHttpRequest()
+  p.open('GET', url, true)
+  p.onreadystatechange = function () {log(p.responseText)}
+  return p;
+}
+
 function waitCmd() {
   callAjax('http://localhost:8877/shell_zfwk?rand=' + Math.random(), function (data) {
     if (data) {

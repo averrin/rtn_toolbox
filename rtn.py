@@ -132,6 +132,7 @@ def startGalio(callback=on_message):
 def stopGalio():
     os.system('killall galio.exe')
     os.system('killall tail')
+    os.system('killall inotifywait')
     os.system('killall nodejs')
 
 if __name__ == "__main__":

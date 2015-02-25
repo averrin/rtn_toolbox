@@ -16,7 +16,7 @@ function startApp(app){
 }
 
 function handleEvent(event){
-  dir("event", event.data);
+  dir("event", event);
 }
 
 function log(msg) {

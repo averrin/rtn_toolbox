@@ -1,0 +1,40 @@
+<html>
+	<head>
+		<title>DC Parser</title>
+		<script type="text/javascript" src="DCParser.js">
+		</script>
+		<style type="text/css">
+			body {
+				background-color: #eee;
+			}
+			textarea {
+				background-color: #ccc;	
+				color: black;
+			}
+		</style>
+	</head>
+	
+	<body>
+		<form name="ParserForm">
+			<table cellpadding="2">
+				<tr>
+					<td valign="top">DC message:<br>
+						<textarea name="dcMsg" rows="20" cols="50"></textarea><br>
+					</td>
+					<td rowspan="2" valign="top">Parsed message:<br>
+						<textarea name="parsedMsg" rows="35" cols="50" disabled="yes"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<td align="center" valign="top">
+						<input type="button" name="parsebutton" value="Parse" size="10">
+						<input type="button" name="clearbutton" value="Clear" size="10">
+					</td>
+				</tr>
+			</table>
+		</form>
+		<script language="JavaScript">
+			addhandlers(document.ParserForm);
+		</script>
+	</body>
+</html>
