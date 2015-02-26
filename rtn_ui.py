@@ -499,6 +499,7 @@ class RTN(QMainWindow):
         self.workThread = WorkThread()
         self.connect( self.workThread, SIGNAL("update(QString)"), self.logHandler )
         self.workThread.start()
+        self.BfsThread.start()
 
     def logHandler(self, message):
         log = str(message).strip()
