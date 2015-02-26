@@ -14,8 +14,9 @@ import urlparse
 import json
 import random
 import binascii
+import socket
 
-LOG_HTTP = True
+LOG_HTTP = False
 
 CWD = os.getcwd()
 
@@ -46,11 +47,24 @@ class WorkThread(QThread):
         QThread.__init__(self)
  
     def run(self):
-        startGalio(self.handler)
+        self.work = True
+        startGalio()
+        time.sleep(2)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(("localhost", 54321))
+        sock.send('hi')
+        msg = ''
+        while self.work:
+            msg += sock.recv(1024)
+            while '\n' in msg:
+                line = msg.split('\n')[0]
+                msg = msg[len(line):].strip()
+                if line:
+                    self.handler(line)
         return
 
-    def handler(self, *args):
-        self.emit(SIGNAL("update(QString)"), QString(args[1]))
+    def handler(self, line):
+        self.emit(SIGNAL("update(QString)"), QString(line))
 
 class BfsThread(QThread):
     def __init__(self):
@@ -94,6 +108,7 @@ class ConsoleThread(QThread):
                 sys.stdout.flush()
                 time.sleep(0.3)
                 sys.stdout.write('\b' * (len(ws) + 5))
+        print('')
         print('Connected!')
 
     def run(self):
@@ -211,8 +226,8 @@ class RTN(QMainWindow):
 
         self.history = json.load(file(os.path.join(CWD, 'history.txt'), 'r'))
         self.logView = QTextBrowser()
-        for emblem in os.listdir(os.path.join(CWD, 'emblems')):
-            self.logView.document().addResource(0, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
+        for i, emblem in enumerate(os.listdir(os.path.join(CWD, 'emblems'))):
+            self.logView.document().addResource(i, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
         self.fullogView = QTextBrowser()
         self.consoleView = QTextBrowser()
         self.consoleView.append(colored('Galio javascript console', '#666'))
@@ -354,7 +369,9 @@ class RTN(QMainWindow):
 
 
     def stopGalio(self):
+        self.workThread.work = False
         stopGalio()
+        self.workThread.wait()
         self.message(colored("Emulator stopped", 'red', attrs=["bold"], emblem='red'))
 
     def rtn_toggle(self):
@@ -385,8 +402,6 @@ class RTN(QMainWindow):
 
     def clearLogs(self):
         self.logView.clear()
-        for emblem in os.listdir(os.path.join(CWD, 'emblems')):
-            self.logView.document().addResource(0, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
         # self.fullogView.clear()
 
     def restartApp(self):
@@ -475,15 +490,10 @@ class RTN(QMainWindow):
         stopGalio()
         time.sleep(2)
         self.workThread.start()
+        self.BfsThread.start()
 
     def logHandler(self, message):
-        message = str(message)
-        msg = json.loads(message)
-        if isinstance(msg['data'], dict):
-            print(msg['data'])
-            return
-        log = msg['data'].strip()
-
+        log = str(message).strip()
         try:
             msg = getColored(log, colored)
             if msg is not None:
@@ -505,6 +515,7 @@ if __name__ == "__main__":
     app.exec_()
     stopGalio()
     time.sleep(2)
+    widget.workThread.work = False
     widget.workThread.wait()
     json.dump(map(str, widget.history), file(os.path.join(CWD, 'history.txt'), 'w'))
     sys.exit()

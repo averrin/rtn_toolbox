@@ -105,37 +105,15 @@ def startEmulator():
     cmd = ["wine", "cmd", "/c", "run_galio_HD.bat"]
     subprocess.Popen(cmd)
 
-def startEmulogServer():
-    if not os.path.isfile("ws-translator.js"):
-        os.chdir(os.path.join(CWD, "emulog_server"))
-    cmd = ["nodejs", "ws-translator.js"]
-    subprocess.Popen(cmd)
-
-def runLogTail(callback):
-    websocket.enableTrace(True)
-    ws = websocket.WebSocketApp(
-        "ws://localhost:11337/",
-        on_message = callback,
-        on_error = on_error,
-        on_close = on_close
-    )
-    ws.on_open = on_open
-    ws.run_forever()
-
 import threading
 
-def startGalio(callback=on_message):
+def startGalio():
     startEmulator()
-    startEmulogServer()
-
-    time.sleep(2)
-    runLogTail(callback)
 
 def stopGalio():
     os.system('killall galio.exe')
     os.system('killall tail')
     os.system('killall inotifywait')
-    os.system('killall nodejs')
 
 if __name__ == "__main__":
     startGalio()
