@@ -108,6 +108,7 @@ def startEmulator():
 import threading
 
 def startGalio():
+    print('Staring Galio...')
     startEmulator()
 
 def stopGalio():

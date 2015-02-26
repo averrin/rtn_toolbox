@@ -286,7 +286,7 @@ class RTN(QMainWindow):
         # tabs.addTab(console_widget, 'JS Console')
 
         start_button = QPushButton('Start')
-        start_button.clicked.connect(self.workThread.start)
+        start_button.clicked.connect(self.startWork)
         restart_button = QPushButton('Restart')
         restart_button.clicked.connect(self.restartGalio)
         crestart_button = QPushButton('Clear && Restart')
@@ -361,7 +361,7 @@ class RTN(QMainWindow):
     def gslPayload(self, msg):
         msg = str(msg)
         self.message(colored("Fake GSL recieved:", 'orange', attrs=[""]))
-        self.message(colored(msg, 'orange', attrs=[""]))
+        self.message(colored(msg, 'orange', attrs=["bold"]))
 
 
     def dcFlush(self):
@@ -449,12 +449,15 @@ class RTN(QMainWindow):
 
     def bfsHandler(self, msg):
         msg = str(msg).strip()
-        ts, folder, filename, event = msg.replace("'", '').split(' -- ')
-        if 'ISDIR' in event or 'CLOSE' in event:
-            return
-        path = os.path.join(folder, filename)[len(BFS_PATH):]
-        if self.bfs_check.checkState() == Qt.Checked:
-            self.message(colored("BFS: %s -- %s" % (event, path), "pink"))
+        try:
+            ts, folder, filename, event = msg.replace("'", '').split(' -- ')
+            if 'ISDIR' in event or 'CLOSE' in event:
+                return
+            path = os.path.join(folder, filename)[len(BFS_PATH):]
+            if self.bfs_check.checkState() == Qt.Checked:
+                self.message(colored("BFS: %s -- %s" % (event, path), "pink"))
+        except:
+            print(msg)
 
     def message(self, msg):
         if len(msg) > 300:
@@ -489,8 +492,13 @@ class RTN(QMainWindow):
         self.consoleView.clear()
         stopGalio()
         time.sleep(2)
-        self.workThread.start()
+        self.startWork()
         self.BfsThread.start()
+
+    def startWork(self):
+        self.workThread = WorkThread()
+        self.connect( self.workThread, SIGNAL("update(QString)"), self.logHandler )
+        self.workThread.start()
 
     def logHandler(self, message):
         log = str(message).strip()
