@@ -1,6 +1,8 @@
+	var callsigns = [];
 	function isMsgCorrect(msg) {
 		var s = msg;
 		s = s.toLowerCase();
+		s = s.split('[shell] ').join(' ').split(' | ').join(' ');
 		s = s.replace(/[\s*\n*]/g,'');
 		var isCorrect = true;
 		if (s.length == 0) {
@@ -101,6 +103,7 @@
 			s += 'used callsigns: ';
 			for (var i = 0; i < recordsNumber; i++) {
 				returnedTextArray = textDecoder(tmp);
+				callsigns.push(returnedTextArray[0]);
 				s += returnedTextArray[0] + ', ';
 				tmp = tmp.substring(returnedTextArray[1], tmp.length);
 			}
@@ -270,8 +273,8 @@
 		s += 'channel_number: ' + returned7bitArray[0] + '\n\t';
 		tmp = tmp.substring(returned7bitArray[1], tmp.length);
 
-		returned7bitArray = textDecoder(tmp);
-		s += 'callsign: ' + returned7bitArray[0] + '\n\t';
+		returned7bitArray = Decoder7bit(tmp);
+		s += 'callsign: ' + callsigns[returned7bitArray[0]] + '\n\t';
 		tmp = tmp.substring(returned7bitArray[1], tmp.length);
 		
 		returned7bitArray = Decoder7bit(tmp);

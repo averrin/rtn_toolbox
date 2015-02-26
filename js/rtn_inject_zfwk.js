@@ -45,6 +45,23 @@ function dir(name, object) {
   }
 };
 
+
+  var old_logMessage = zfwk.Utils.logMessage
+  zfwk.Utils.logMessage = function(data) {
+    old_logMessage(data);
+    log("DC message:");
+    log("    ");
+    var msg = '';
+    while (data.length > 16) {
+      msg += zfwk.Utils.getByteStr(data.substr(0, 16));
+      data = data.substr(16);
+    }
+    if (data.length > 0)
+      msg += zfwk.Utils.getByteStr(data);
+    log(msg.split(' | ').join(" "));
+    log("    ");
+  };
+
 function sendAnswer(answ){
   var xmlhttp;
   xmlhttp = new XMLHttpRequest();

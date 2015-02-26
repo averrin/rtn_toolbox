@@ -12,6 +12,10 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from SocketServer import ThreadingMixIn
 import urlparse
 import json
+import random
+import binascii
+
+LOG_HTTP = True
 
 CWD = os.getcwd()
 
@@ -23,14 +27,17 @@ color_correct = {
     ("green", ''): '#A6E22E'
 }
 
-def colored(msg, color, attrs=[]):
+def colored(msg, color, attrs=[], emblem=None):
     if (color, attrs[0] if attrs else '') in color_correct:
         color = color_correct[(color, attrs[0] if attrs else '')]
-    return '<span style="color: %s; font-weight: %s">%s</span>' % (
+    msg = '<span style="color: %s; font-weight: %s">%s</span>' % (
         color, 
         "bold" if "bold" in attrs else "normal", 
         msg
     )
+    if emblem is not None:
+        msg = ('<img src="emblems/%s.png">' % emblem) + msg
+    return msg
 
 app = QApplication(sys.argv)
 
@@ -114,8 +121,19 @@ class Handler(BaseHTTPRequestHandler):
         self.msg("Shell injected", fix)
 
     def do_GET(self):
+        if self.path.startswith('/initProxyClient') or self.path.startswith('/remoteServiceEvent') or self.path.startswith('/initTCPServer') or self.path.startswith('/initUDPService'):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write('Goot')
+            return
+
         if self.path.startswith('/SSEEvents'):
-            return self.send('')
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write('One\r\n')
+            self.wfile.write('Two\r\n')
+            self.wfile.write('Three\r\n')
+            return
         if self.path.startswith("/inject_zfwk"):
             return self.inject('_zfwk')
         if self.path.startswith("/inject"):
@@ -133,22 +151,42 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
 
-        if self.path.startswith('/applicationID'):
-            self.send('Galio')
-
         length = int(self.headers['Content-Length'])
         answer = urlparse.parse_qs(self.rfile.read(length).decode('utf-8'))
+        if self.path.startswith('/applicationID'):
+            print(answer)
+            try:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(answer['name'][0])
+            except Exceprion as e:
+                print(e)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write('Galio')
+            return
         if self.path == '/answer':
             answer = answer['answer'][0]
             self.msg(">> %s" % answer, '')
         if self.path == '/answer_zfwk':
             answer = answer['answer'][0]
             self.msg(">> %s" % answer, '_zfwk')
+
+        if self.path == '/sendRequest':
+            print(answer['payload'])
+            pl = answer['payload'][0]
+            pl = binascii.a2b_base64(pl)[12:]
+            print('Payload:')
+            print(pl)
+            pl = "".join("{:02x}".format(ord(c)) for c in pl)
+            self.parent.emit(SIGNAL("payload(QString)"), QString(pl))
         
         self.send('thx')
         
 
     def log_message(self, format, *args):
+        if LOG_HTTP:
+            BaseHTTPRequestHandler.log_message(self, format, *args)
         return
 
 class RTN(QMainWindow):
@@ -173,6 +211,8 @@ class RTN(QMainWindow):
 
         self.history = json.load(file(os.path.join(CWD, 'history.txt'), 'r'))
         self.logView = QTextBrowser()
+        for emblem in os.listdir(os.path.join(CWD, 'emblems')):
+            self.logView.document().addResource(0, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
         self.fullogView = QTextBrowser()
         self.consoleView = QTextBrowser()
         self.consoleView.append(colored('Galio javascript console', '#666'))
@@ -188,6 +228,7 @@ class RTN(QMainWindow):
         self.q_zfwk = []
         self.consoleThread = ConsoleThread(self.q, self.q_zfwk)
         self.connect( self.consoleThread, SIGNAL("update(QString, QString)"), self.consoleIOHandler )
+        self.connect( self.consoleThread, SIGNAL("payload(QString)"), self.gslPayload )
         self.consoleThread.start()
 
         self.notes_widget = QTextEdit()
@@ -236,7 +277,7 @@ class RTN(QMainWindow):
         crestart_button = QPushButton('Clear && Restart')
         crestart_button.clicked.connect(self.clear_restart)
         stop_button = QPushButton('Stop')
-        stop_button.clicked.connect(stopGalio)
+        stop_button.clicked.connect(self.stopGalio)
         widget.setLayout(QHBoxLayout())
         bpanel.setLayout(QVBoxLayout())
         widget.layout().addWidget(tabs)
@@ -256,6 +297,9 @@ class RTN(QMainWindow):
         openinject_button = QPushButton('Edit injects')
         openinject_button.clicked.connect(self.openInject)
 
+        flush_button = QPushButton('DC Flush')
+        flush_button.clicked.connect(self.dcFlush)
+
         bpanel.layout().addWidget(QLabel("Galio controls"))
         bpanel.layout().addWidget(start_button)
         bpanel.layout().addWidget(restart_button)
@@ -268,6 +312,7 @@ class RTN(QMainWindow):
         bpanel.layout().addWidget(remove_button)
         bpanel.layout().addWidget(openlog_button)
         bpanel.layout().addWidget(openinject_button)
+        bpanel.layout().addWidget(flush_button)
 
         bpanel.layout().addWidget(QLabel("Log details"))
         self.bfs_check = QCheckBox('Show BFS')
@@ -280,6 +325,10 @@ class RTN(QMainWindow):
         self.zfwk_check = QCheckBox('Show ZFWK')
         self.zfwk_check.stateChanged.connect(self.zfwk_toggle)
         bpanel.layout().addWidget(self.zfwk_check)
+
+        self.errors_check = QCheckBox('Show Errors')
+        self.errors_check.stateChanged.connect(self.errors_toggle)
+        bpanel.layout().addWidget(self.errors_check)
 
 
         bpanel.layout().addSpacerItem(QSpacerItem(20,40,QSizePolicy.Minimum,QSizePolicy.Expanding))
@@ -294,19 +343,40 @@ class RTN(QMainWindow):
         self.consoleInput.setCompleter(self.completer)
         self.consoleInput2.setCompleter(self.completer)
 
+    def gslPayload(self, msg):
+        msg = str(msg)
+        self.message(colored("Fake GSL recieved:", 'orange', attrs=[""]))
+        self.message(colored(msg, 'orange', attrs=[""]))
+
+
+    def dcFlush(self):
+        self.q_zfwk.append('dcFlush()')
+
+
+    def stopGalio(self):
+        stopGalio()
+        self.message(colored("Emulator stopped", 'red', attrs=["bold"], emblem='red'))
+
     def rtn_toggle(self):
         event = {"color": "white", "attrs": [], "check": lambda p, t, l: "RTNUI" in l, "name": "rtnui"}
         if self.rtnui_check.checkState() == Qt.Checked:
             color_pref.append(event)
         else:
-            color_pref.remove(filter(lambda x: x['name'] == 'rtnui', color_pref)[0])
+            color_pref.remove(filter(lambda x: x['name'] == event['name'], color_pref)[0])
 
     def zfwk_toggle(self):
         event = {"color": "white", "attrs": [], "check": lambda p, t, l: p == '[ZFWK]', "name": "zfwk"}
         if self.zfwk_check.checkState() == Qt.Checked:
             color_pref.append(event)
         else:
-            color_pref.remove(filter(lambda x: x['name'] == 'zfwk', color_pref)[0])
+            color_pref.remove(filter(lambda x: x['name'] == event['name'], color_pref)[0])
+
+    def errors_toggle(self):
+        event = {"color": "red", "attrs": [], "check": lambda p, t, l: "[E]" in l, "name": "errors"}
+        if self.errors_check.checkState() == Qt.Checked:
+            color_pref.append(event)
+        else:
+            color_pref.remove(filter(lambda x: x['name'] == event['name'], color_pref)[0])
 
 
     def saveNotes(self):
@@ -315,6 +385,8 @@ class RTN(QMainWindow):
 
     def clearLogs(self):
         self.logView.clear()
+        for emblem in os.listdir(os.path.join(CWD, 'emblems')):
+            self.logView.document().addResource(0, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
         # self.fullogView.clear()
 
     def restartApp(self):
@@ -420,7 +492,7 @@ class RTN(QMainWindow):
             pass
 
         if isEmulatorLoaded(log):
-            self.message(colored("Emulator loaded", 'yellow', attrs=["bold"]))
+            self.message(colored("Emulator loaded", 'green', attrs=["bold"], emblem='green'))
             activateEmulator()
         logging.info(log)
 

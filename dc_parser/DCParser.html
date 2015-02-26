@@ -16,22 +16,14 @@
 	
 	<body>
 		<form name="ParserForm">
-			<table cellpadding="2">
-				<tr>
-					<td valign="top">DC message:<br>
-						<textarea name="dcMsg" rows="20" cols="50"></textarea><br>
-					</td>
-					<td rowspan="2" valign="top">Parsed message:<br>
-						<textarea name="parsedMsg" rows="35" cols="50" disabled="yes"></textarea>
-					</td>
-				</tr>
-				<tr>
-					<td align="center" valign="top">
+
+					<h4>DC message:</h4>
+						<textarea name="dcMsg" rows="20" cols="50"></textarea>
 						<input type="button" name="parsebutton" value="Parse" size="10">
 						<input type="button" name="clearbutton" value="Clear" size="10">
-					</td>
-				</tr>
-			</table>
+					<h4>Parsed message:</h4>
+						<textarea name="parsedMsg" rows="35" cols="50" disabled="yes"></textarea>
+
 		</form>
 		<script language="JavaScript">
 			addhandlers(document.ParserForm);
