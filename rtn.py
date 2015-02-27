@@ -11,7 +11,7 @@ import logging
 CWD = os.getcwd()
 logging.basicConfig(filename=os.path.join(CWD, 'rtn_log.log'), level=logging.DEBUG)
 import time
-from rtn_rules import *
+import rtn_rules
 
 BFS_PATH = '/home/user/.wine/drive_c/Cisco-SDK/downloads/bfs'
 
@@ -35,8 +35,8 @@ def getAttrs(log):
 def getColored(log, colorfn=colored):
     prefix, tag, log = getAttrs(log)
     msg = None
-    for rn in active_rules:
-        r = rules[rn]
+    for rn in rtn_rules.active_rules:
+        r = rtn_rules.rules[rn]
         if r['check'](prefix, tag, log):
             msg = colorfn(log, r['color'], attrs=r['attrs'])
     return msg

@@ -324,8 +324,8 @@ class RTN(QMainWindow):
 
         rules_button = QPushButton('Edit log rules')
         rules_button.clicked.connect(self.editRules)
-        restartapp_button = QPushButton('Restart app')
-        restartapp_button.clicked.connect(self.restartApp)
+        rrules_button = QPushButton('Reload rules')
+        rrules_button.clicked.connect(self.reloadRules)
 
         clear_button = QPushButton('Clear logs')
         clear_button.clicked.connect(self.clearLogs)
@@ -346,7 +346,7 @@ class RTN(QMainWindow):
         bpanel.layout().addWidget(stop_button)
         bpanel.layout().addWidget(QLabel("Other utils"))
         bpanel.layout().addWidget(rules_button)
-        # bpanel.layout().addWidget(restartapp_button)
+        bpanel.layout().addWidget(rrules_button)
         bpanel.layout().addWidget(clear_button)
         bpanel.layout().addWidget(remove_button)
         bpanel.layout().addWidget(openlog_button)
@@ -400,22 +400,21 @@ class RTN(QMainWindow):
 
     def rtn_toggle(self):
         if self.rtnui_check.checkState() == Qt.Checked:
-            active_rules.append('rtnui')
-        else:
-            active_rules.remove('rtnui')
+            rtn_rules.active_rules.append('rtnui')
+        elif 'rtnui' in rtn_rules.active_rules:
+            rtn_rules.active_rules.remove('rtnui')
 
     def zfwk_toggle(self):
         if self.zfwk_check.checkState() == Qt.Checked:
-            active_rules.append('zfwk')
-        else:
-            active_rules.remove('zfwk')
+            rtn_rules.active_rules.append('zfwk')
+        elif 'zfwk' in rtn_rules.active_rules:
+            rtn_rules.active_rules.remove('zfwk')
 
     def errors_toggle(self):
-        event = rules['errors']
         if self.errors_check.checkState() == Qt.Checked:
-            active_rules.append('errors')
-        else:
-            active_rules.remove('errors')
+            rtn_rules.active_rules.append('errors')
+        elif 'errors' in rtn_rules.active_rules:
+            rtn_rules.active_rules.remove('errors')
 
 
     def saveNotes(self):
@@ -435,6 +434,12 @@ class RTN(QMainWindow):
 
     def editRules(self):
         subprocess.Popen(['subl', os.path.join(CWD, 'rtn_rules.py')])
+
+    def reloadRules(self):
+        reload(rtn_rules)
+        self.rtn_toggle()
+        self.zfwk_toggle()
+        self.errors_toggle()
 
     def removeLog(self):
         open(os.path.join(CWD, 'rtn_log.log'), 'w').write("")
