@@ -18,6 +18,10 @@ function startApp(app){
 function handleEvent(event){
   log("Event in controller:")
   dir("event", event.data);
+  a = TVLib.Application.Enumerate.byId(event.data.name)
+  var w = a.owner.window;
+  var doc = w.currentDocument;
+  dir("app", a);
 }
 
 function log(msg) {

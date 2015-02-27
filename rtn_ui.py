@@ -25,7 +25,8 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 color_correct = {
     ("blue", "bold"): '#8888ff',
-    ("green", ''): '#A6E22E'
+    ("green", ''): '#A6E22E',
+    ("green", 'bold'): '#A6D22E',
 }
 
 def colored(msg, color, attrs=[], emblem=None):
@@ -36,8 +37,8 @@ def colored(msg, color, attrs=[], emblem=None):
         "bold" if "bold" in attrs else "normal", 
         msg
     )
-    if emblem is not None:
-        msg = ('<img src="emblems/%s.png">' % emblem) + msg
+    # if emblem is not None:
+        # msg = ('<img src="emblems/%s.png">' % emblem) + msg
     return msg
 
 app = QApplication(sys.argv)
@@ -48,16 +49,29 @@ class WorkThread(QThread):
  
     def run(self):
         self.work = True
-        startGalio()
-        time.sleep(2)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("localhost", 54321))
+        startGalio()
+        connected = False
+        ws = ' connecting...'
+        while not connected:
+            try:
+                sock.connect(("localhost", 54321))
+                connected = True
+            except:
+                sys.stdout.write('    ' + spinner.next().encode("utf8") + ws)
+                sys.stdout.flush()
+                time.sleep(0.3)
+                sys.stdout.write('\b' * (len(ws) + 5))
+        print('')
+        print('Connected!')
+
         sock.send('hi')
         msg = ''
+        sep = '\n'
         while self.work:
             msg += sock.recv(1024)
-            while '\n' in msg:
-                line = msg.split('\n')[0]
+            while sep in msg:
+                line = msg.split(sep)[0]
                 msg = msg[len(line):].strip()
                 if line:
                     self.handler(line)
@@ -135,6 +149,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send(file(os.path.join(CWD, "js/rtn_inject%s.js" % fix), 'r').read())
         self.msg("Shell injected", fix)
 
+    def injectFB(self):
+        self.send(file(os.path.join(CWD, "js/firebug-lite.js"), 'r').read())
+
     def do_GET(self):
         if self.path.startswith('/initProxyClient') or self.path.startswith('/remoteServiceEvent') or self.path.startswith('/initTCPServer') or self.path.startswith('/initUDPService'):
             self.send_response(200)
@@ -151,6 +168,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path.startswith("/inject_zfwk"):
             return self.inject('_zfwk')
+        if self.path.startswith("/firebug-lite.js"):
+            return self.injectFB()
         if self.path.startswith("/inject"):
             return self.inject()
         if self.path.startswith("/shell_zfwk"):
@@ -180,12 +199,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write('Galio')
             return
-        if self.path == '/answer':
-            answer = answer['answer'][0]
-            self.msg(">> %s" % answer, '')
-        if self.path == '/answer_zfwk':
-            answer = answer['answer'][0]
-            self.msg(">> %s" % answer, '_zfwk')
+        try:
+            if self.path == '/answer':
+                answer = answer['answer'][0]
+                self.msg(">> %s" % answer, '')
+                return
+            if self.path == '/answer_zfwk':
+                answer = answer['answer'][0]
+                self.msg(">> %s" % answer, '_zfwk')
+                return
+        except Exception as e:
+            print(e.message)
+            print(self.path, answer)
 
         if self.path == '/sendRequest':
             print(answer['payload'])
@@ -194,9 +219,8 @@ class Handler(BaseHTTPRequestHandler):
             print('Payload:')
             print(pl)
             pl = "".join("{:02x}".format(ord(c)) for c in pl)
-            self.parent.emit(SIGNAL("payload(QString)"), QString(pl))
-        
-        self.send('thx')
+            self.parent.emit(SIGNAL("payload(QString)"), QString(pl))        
+            self.send('thx')
         
 
     def log_message(self, format, *args):
@@ -226,8 +250,8 @@ class RTN(QMainWindow):
 
         self.history = json.load(file(os.path.join(CWD, 'history.txt'), 'r'))
         self.logView = QTextBrowser()
-        for i, emblem in enumerate(os.listdir(os.path.join(CWD, 'emblems'))):
-            self.logView.document().addResource(i, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
+        for emblem in os.listdir(os.path.join(CWD, 'emblems')):
+            self.logView.document().addResource(2, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
         self.fullogView = QTextBrowser()
         self.consoleView = QTextBrowser()
         self.consoleView.append(colored('Galio javascript console', '#666'))
@@ -372,28 +396,26 @@ class RTN(QMainWindow):
         self.workThread.work = False
         stopGalio()
         self.workThread.wait()
-        self.message(colored("Emulator stopped", 'red', attrs=["bold"], emblem='red'))
+        self.message(colored(" === Emulator stopped === ", 'red', attrs=["bold"], emblem='red'))
 
     def rtn_toggle(self):
-        event = {"color": "white", "attrs": [], "check": lambda p, t, l: "RTNUI" in l, "name": "rtnui"}
         if self.rtnui_check.checkState() == Qt.Checked:
-            color_pref.append(event)
+            active_rules.append('rtnui')
         else:
-            color_pref.remove(filter(lambda x: x['name'] == event['name'], color_pref)[0])
+            active_rules.remove('rtnui')
 
     def zfwk_toggle(self):
-        event = {"color": "white", "attrs": [], "check": lambda p, t, l: p == '[ZFWK]', "name": "zfwk"}
         if self.zfwk_check.checkState() == Qt.Checked:
-            color_pref.append(event)
+            active_rules.append('zfwk')
         else:
-            color_pref.remove(filter(lambda x: x['name'] == event['name'], color_pref)[0])
+            active_rules.remove('zfwk')
 
     def errors_toggle(self):
-        event = {"color": "red", "attrs": [], "check": lambda p, t, l: "[E]" in l, "name": "errors"}
+        event = rules['errors']
         if self.errors_check.checkState() == Qt.Checked:
-            color_pref.append(event)
+            active_rules.append('errors')
         else:
-            color_pref.remove(filter(lambda x: x['name'] == event['name'], color_pref)[0])
+            active_rules.remove('errors')
 
 
     def saveNotes(self):
@@ -402,6 +424,8 @@ class RTN(QMainWindow):
 
     def clearLogs(self):
         self.logView.clear()
+        # for emblem in os.listdir(os.path.join(CWD, 'emblems')):
+        #     self.logView.document().addResource(2, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
         # self.fullogView.clear()
 
     def restartApp(self):
@@ -496,6 +520,7 @@ class RTN(QMainWindow):
         self.BfsThread.start()
 
     def startWork(self):
+        self.message(colored(" === Start emulator === ", 'yellow', attrs=["bold"], emblem='yellow'))
         self.workThread = WorkThread()
         self.connect( self.workThread, SIGNAL("update(QString)"), self.logHandler )
         self.workThread.start()
@@ -511,7 +536,7 @@ class RTN(QMainWindow):
             pass
 
         if isEmulatorLoaded(log):
-            self.message(colored("Emulator loaded", 'green', attrs=["bold"], emblem='green'))
+            self.message(colored(" === Emulator loaded === ", 'green', attrs=["bold"], emblem='green'))
             activateEmulator()
         logging.info(log)
 

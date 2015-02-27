@@ -35,7 +35,8 @@ def getAttrs(log):
 def getColored(log, colorfn=colored):
     prefix, tag, log = getAttrs(log)
     msg = None
-    for r in color_pref:
+    for rn in active_rules:
+        r = rules[rn]
         if r['check'](prefix, tag, log):
             msg = colorfn(log, r['color'], attrs=r['attrs'])
     return msg

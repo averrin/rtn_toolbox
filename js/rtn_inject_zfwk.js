@@ -3,7 +3,7 @@ function handleEvent(event){
 }
 
 function log(msg) {
-  debug.log("[SHELL] - 00:00:00.000 - [D]: [shell] " + msg)
+  debug.log("[SHELL] - 00:00:00.000 - [D]: [zshell] " + msg)
 }
 
 function dcFlush(){
@@ -62,14 +62,14 @@ function dir(name, object) {
     log("    ");
   };
 
-function sendAnswer(answ){
+function zsendAnswer(answ){
   var xmlhttp;
   xmlhttp = new XMLHttpRequest();
   xmlhttp.open("POST", 'http://localhost:8877/answer_zfwk', true);
   xmlhttp.send('answer=' + answ);
 }
 
-function callAjax(url, callback) {
+function zcallAjax(url, callback) {
   var xmlhttp;
   xmlhttp = new XMLHttpRequest();
   xmlhttp.onreadystatechange = function () {
@@ -98,24 +98,24 @@ function get(url){
   return p;
 }
 
-function waitCmd() {
-  callAjax('http://localhost:8877/shell_zfwk?rand=' + Math.random(), function (data) {
+function zwaitCmd() {
+  zcallAjax('http://localhost:8877/shell_zfwk?rand=' + Math.random(), function (data) {
     if (data) {
       log("injected: " + data);
       try {
         var answ = eval(data);
         if (answ) {
           log("answer: " + answ);
-          sendAnswer(answ)
+          zsendAnswer(answ)
         }
       } catch (e) {
         log("error: " + e);
       }
     }
-    setTimeout(waitCmd, 500);
+    setTimeout(zwaitCmd, 500);
   });
 }
 
 log("Injected ZFWK shell is ready.");
-sendAnswer("Hi from ZFWK!")
-waitCmd();
+zsendAnswer("Hi from ZFWK!")
+zwaitCmd();
