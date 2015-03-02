@@ -12,8 +12,11 @@ CWD = os.getcwd()
 logging.basicConfig(filename=os.path.join(CWD, 'rtn_log.log'), level=logging.DEBUG)
 import time
 import rtn_rules
+import ConfigParser
+config = ConfigParser.ConfigParser()
+config.read(os.path.join(CWD, 'toolbox.cfg'))
 
-BFS_PATH = '/home/user/.wine/drive_c/Cisco-SDK/downloads/bfs'
+BFS_PATH = config.get('locations', 'BFS_PATH')
 
 def spinning_cursor():
     while True:
@@ -101,7 +104,7 @@ def on_open(ws):
 
 def startEmulator():
     if not os.path.isfile("run_galio_HD.bat"):
-        location = "/home/user/.wine/drive_c/Cisco-SDK/"
+        location = config.get('locations', 'EMULATOR_PATH')
         os.chdir(location)
     cmd = ["wine", "cmd", "/c", "run_galio_HD.bat"]
     subprocess.Popen(cmd)

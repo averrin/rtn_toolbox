@@ -18,8 +18,6 @@ import socket
 from de7bit import Decoder, encodeInt
 import base64
 
-LOG_HTTP = True
-
 CWD = os.getcwd()
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -168,7 +166,8 @@ class Handler(BaseHTTPRequestHandler):
             info = 'A'
             data = base64.b64encode(encodeInt(flags) + mac + encodeInt(len(msg)) + encodeInt(msg_type) + msg_id + info + msg) + '\r\n'
             event += "data: %s"  % data
-        print(event)
+        if config.getboolean('logging', 'LOG_SSE'):
+            print(event)
         self.wfile.write(event)
 
     def do_GET(self):
@@ -244,7 +243,7 @@ class Handler(BaseHTTPRequestHandler):
         
 
     def log_message(self, format, *args):
-        if LOG_HTTP:
+        if config.getboolean('logging', 'LOG_HTTP'):
             BaseHTTPRequestHandler.log_message(self, format, *args)
         return
 
