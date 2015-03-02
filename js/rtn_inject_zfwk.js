@@ -88,7 +88,7 @@ function zcallAjax(url, callback) {
   xmlhttp.open("GET", url, true);
   xmlhttp.send();
   // log("waiting for command...");
-  var timeout = setTimeout( function(){ xmlhttp.abort(); waitCmd(); }, 1000);
+  var timeout = setTimeout( function(){ xmlhttp.abort(); zwaitCmd(); }, 1000);
 }
 
 function get(url){

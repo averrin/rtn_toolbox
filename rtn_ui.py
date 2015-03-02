@@ -15,6 +15,7 @@ import json
 import random
 import binascii
 import socket
+from de7bit import Decoder
 
 LOG_HTTP = False
 
@@ -303,10 +304,19 @@ class RTN(QMainWindow):
         self.parserView = QWebView()
         self.parserView.setUrl(QUrl(os.path.join(CWD, 'dc_parser/DCParser.html')))
 
+        self.parserViewNG = QWidget()
+        self.parserViewNG.setLayout(QVBoxLayout())
+        self.dcMessageInput = QTextEdit()
+        self.dcMessageOutput = QTextBrowser()
+        self.parserViewNG.layout().addWidget(self.dcMessageInput)
+        self.parserViewNG.layout().addWidget(self.dcMessageOutput)
+        self.dcMessageInput.textChanged.connect(self.decodeDC)
+
         tabs = QTabWidget()
         tabs.addTab(self.logView, 'Log')
         tabs.addTab(self.fullogView, 'Full log')
         tabs.addTab(self.parserView, 'DC Parser')
+        tabs.addTab(self.parserViewNG, 'DC Parser NG')
         # tabs.addTab(console_widget, 'JS Console')
 
         start_button = QPushButton('Start')
@@ -381,6 +391,20 @@ class RTN(QMainWindow):
         # completer.setFilterMode(Qt.MatchContains)
         self.consoleInput.setCompleter(self.completer)
         self.consoleInput2.setCompleter(self.completer)
+
+    def decodeDC(self, *args):
+        message = str(self.dcMessageInput.toPlainText())
+        d = Decoder(message)
+        try:
+            d.decode()
+            d.display(show=self.displayDC)
+        except Exception as e:
+            self.dcMessageOutput.append("Decode error: %s" % e.message)
+            print(e)
+
+    def displayDC(self, msg):
+        self.dcMessageOutput.clear()
+        self.dcMessageOutput.append(msg)
 
     def gslPayload(self, msg):
         msg = str(msg)
