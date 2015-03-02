@@ -2,6 +2,16 @@ from __future__ import print_function
 import datetime
 import json
 
+
+def encodeInt(number):
+	encoded = []
+	number = int(number)
+	while number > 127:
+		encoded.append(int(number & 0xFF | 0x80))
+		number = round(int(number / (2 ** 7)))
+	encoded.append(int(number) & 0xFF)
+	return ''.join(map(chr, encoded))
+
 class Decoder(object):
 	def __init__(self, msg):
 		self.data = [msg[i:i+2] for i in range(0, len(msg), 2)]

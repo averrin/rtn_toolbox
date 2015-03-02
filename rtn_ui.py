@@ -15,9 +15,10 @@ import json
 import random
 import binascii
 import socket
-from de7bit import Decoder
+from de7bit import Decoder, encodeInt
+import base64
 
-LOG_HTTP = False
+LOG_HTTP = True
 
 CWD = os.getcwd()
 
@@ -153,6 +154,23 @@ class Handler(BaseHTTPRequestHandler):
     def injectFB(self):
         self.send(file(os.path.join(CWD, "js/firebug-lite.js"), 'r').read())
 
+    def fakeSSEEvents(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.end_headers()
+        event = "id: %s\r\n" % random.randint(0, 9999)
+        for i in xrange(3):
+            msg = "AAAA"
+            flags = 3
+            mac = "74d435"
+            msg_type = 0
+            msg_id = 'AA'
+            info = 'A'
+            data = base64.b64encode(encodeInt(flags) + mac + encodeInt(len(msg)) + encodeInt(msg_type) + msg_id + info + msg) + '\r\n'
+            event += "data: %s"  % data
+        print(event)
+        self.wfile.write(event)
+
     def do_GET(self):
         if self.path.startswith('/initProxyClient') or self.path.startswith('/remoteServiceEvent') or self.path.startswith('/initTCPServer') or self.path.startswith('/initUDPService'):
             self.send_response(200)
@@ -161,12 +179,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if self.path.startswith('/SSEEvents'):
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write('One\r\n')
-            self.wfile.write('Two\r\n')
-            self.wfile.write('Three\r\n')
-            return
+            return self.fakeSSEEvents()
         if self.path.startswith("/inject_zfwk"):
             return self.inject('_zfwk')
         if self.path.startswith("/firebug-lite.js"):
@@ -188,6 +201,12 @@ class Handler(BaseHTTPRequestHandler):
 
         length = int(self.headers['Content-Length'])
         answer = urlparse.parse_qs(self.rfile.read(length).decode('utf-8'))
+        if self.path.startswith('/initProxyClient') or self.path.startswith('/remoteServiceEvent') or self.path.startswith('/initTCPServer') or self.path.startswith('/initUDPService'):
+            print(answer)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write('Goot')
+            return
         if self.path.startswith('/applicationID'):
             print(answer)
             try:
