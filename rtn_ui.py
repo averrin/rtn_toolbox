@@ -3,9 +3,10 @@
 
 import sys
 import time
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
-from PyQt4.QtWebKit import QWebView
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
+from PyQt5.QtWebKitWidgets import QWebView
 from rtn import *
 import subprocess
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
@@ -18,7 +19,8 @@ import socket
 from de7bit import Decoder, encodeInt
 import base64
 
-CWD = os.getcwd()
+CWD = os.path.split(sys.argv[0])[0]
+
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
@@ -29,24 +31,28 @@ color_correct = {
     ("green", 'bold'): '#A6D22E',
 }
 
+
 def colored(msg, color, attrs=[], emblem=None):
     if (color, attrs[0] if attrs else '') in color_correct:
         color = color_correct[(color, attrs[0] if attrs else '')]
     msg = '<span style="color: %s; font-weight: %s">%s</span>' % (
-        color, 
-        "bold" if "bold" in attrs else "normal", 
+        color,
+        "bold" if "bold" in attrs else "normal",
         msg
     )
     # if emblem is not None:
-        # msg = ('<img src="emblems/%s.png">' % emblem) + msg
+    # msg = ('<img src="emblems/%s.png">' % emblem) + msg
     return msg
 
 app = QApplication(sys.argv)
 
+
 class WorkThread(QThread):
+    update = pyqtSignal(unicode)
+
     def __init__(self):
         QThread.__init__(self)
- 
+
     def run(self):
         self.work = True
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -78,22 +84,36 @@ class WorkThread(QThread):
         return
 
     def handler(self, line):
-        self.emit(SIGNAL("update(QString)"), QString(line))
+        self.update.emit(line)
+
 
 class BfsThread(QThread):
+    update = pyqtSignal(unicode)
+
     def __init__(self):
         QThread.__init__(self)
 
     def run(self):
-        cmd = ["inotifywait", "-m", "-r", BFS_PATH, "--timefmt", "%d-%m-%Y", "--format", "'%T -- %w -- %f -- %e'"]
+        cmd = [
+            "inotifywait",
+            "-m",
+            "-r",
+            BFS_PATH,
+            "--timefmt",
+            "%d-%m-%Y",
+            "--format",
+            "'%T -- %w -- %f -- %e'"]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         while 1:
             line = p.stdout.readline()
-            self.emit(SIGNAL("update(QString)"), QString(line))
+            self.update.emit(line)
             if not line:
                 break
 
+
 class LogThread(QThread):
+    update = pyqtSignal(unicode)
+
     def __init__(self):
         QThread.__init__(self)
 
@@ -102,11 +122,15 @@ class LogThread(QThread):
         p = subprocess.Popen(["tail", "-f", fn], stdout=subprocess.PIPE)
         while 1:
             line = p.stdout.readline()
-            self.emit(SIGNAL("update(QString)"), QString(line))
+            self.update.emit(line)
             if not line:
                 break
 
+
 class ConsoleThread(QThread):
+    update = pyqtSignal(unicode, unicode)
+    payload = pyqtSignal(unicode)
+
     def __init__(self, q, q_zfwk):
         QThread.__init__(self)
         self.q = q
@@ -116,7 +140,8 @@ class ConsoleThread(QThread):
         ws = ' connecting...'
         while self.consoleServer is None:
             try:
-                self.consoleServer = ThreadedHTTPServer(('localhost', 8877), self.consoleHandler)
+                self.consoleServer = ThreadedHTTPServer(
+                    ('localhost', 8877), self.consoleHandler)
             except Exception as e:
                 sys.stdout.write('    ' + spinner.next().encode("utf8") + ws)
                 sys.stdout.flush()
@@ -128,8 +153,10 @@ class ConsoleThread(QThread):
     def run(self):
         self.consoleServer.serve_forever()
 
+
 def handleRequestsUsing(parent):
     return lambda *args: Handler(parent, *args)
+
 
 class Handler(BaseHTTPRequestHandler):
     def __init__(self, parent, *args):
@@ -137,7 +164,7 @@ class Handler(BaseHTTPRequestHandler):
         BaseHTTPRequestHandler.__init__(self, *args)
 
     def msg(self, message, fix):
-        self.parent.emit(SIGNAL("update(QString, QString)"), QString(message), QString(fix))
+        self.parent.update.emit(message, fix)
 
     def send(self, msg, code=200):
         self.send_response(code)
@@ -146,7 +173,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write('\n')
 
     def inject(self, fix=''):
-        self.send(file(os.path.join(CWD, "js/rtn_inject%s.js" % fix), 'r').read())
+        self.send(
+            file(os.path.join(CWD, "js/rtn_inject%s.js" % fix), 'r').read())
         self.msg("Shell injected", fix)
 
     def injectFB(self):
@@ -156,22 +184,28 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
-        event = "id: %s\r\n" % random.randint(0, 9999)
-        for i in xrange(3):
-            msg = "AAAA"
+        event = "id: %s\n" % random.randint(0, 9999)
+        for i in xrange(4):
+            msg = "from toolbox"
             flags = 3
             mac = "74d435"
-            msg_type = 0
-            msg_id = 'AA'
-            info = 'A'
-            data = base64.b64encode(encodeInt(flags) + mac + encodeInt(len(msg)) + encodeInt(msg_type) + msg_id + info + msg) + '\r\n'
-            event += "data: %s"  % data
+            msg_type = 2
+            msg_id = 'AB'
+            info = 'C'
+            l = len(msg) + 1
+            data = encodeInt(flags) + mac + \
+                encodeInt(l) + encodeInt(msg_type) + msg
+            data = base64.b64encode(data) + '\n'
+            event += "data: %s" % data
         if config.getboolean('logging', 'LOG_SSE'):
             print(event)
         self.wfile.write(event)
 
     def do_GET(self):
-        if self.path.startswith('/initProxyClient') or self.path.startswith('/remoteServiceEvent') or self.path.startswith('/initTCPServer') or self.path.startswith('/initUDPService'):
+        if self.path.startswith('/initProxyClient') or \
+            self.path.startswith('/remoteServiceEvent') or \
+            self.path.startswith('/initTCPServer') or \
+                self.path.startswith('/initUDPService'):
             self.send_response(200)
             self.end_headers()
             self.wfile.write('Goot')
@@ -200,7 +234,10 @@ class Handler(BaseHTTPRequestHandler):
 
         length = int(self.headers['Content-Length'])
         answer = urlparse.parse_qs(self.rfile.read(length).decode('utf-8'))
-        if self.path.startswith('/initProxyClient') or self.path.startswith('/remoteServiceEvent') or self.path.startswith('/initTCPServer') or self.path.startswith('/initUDPService'):
+        if self.path.startswith('/initProxyClient') or \
+            self.path.startswith('/remoteServiceEvent') or \
+            self.path.startswith('/initTCPServer') or \
+                self.path.startswith('/initUDPService'):
             print(answer)
             self.send_response(200)
             self.end_headers()
@@ -233,19 +270,22 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == '/sendRequest':
             print(answer['payload'])
-            pl = answer['payload'][0]
-            pl = binascii.a2b_base64(pl)[12:]
+            pl = answer['payload'][0][16:]
+            if len(pl) % 4 != 0:  # check if multiple of 4
+                while len(pl) % 4 != 0:
+                    pl = pl + "="
+            pl = binascii.a2b_base64(pl)
             print('Payload:')
             print(pl)
             pl = "".join("{:02x}".format(ord(c)) for c in pl)
-            self.parent.emit(SIGNAL("payload(QString)"), QString(pl))        
+            self.parent.payload.emit(pl)
             self.send('thx')
-        
 
     def log_message(self, format, *args):
         if config.getboolean('logging', 'LOG_HTTP'):
             BaseHTTPRequestHandler.log_message(self, format, *args)
         return
+
 
 class RTN(QMainWindow):
     def __init__(self):
@@ -258,19 +298,17 @@ class RTN(QMainWindow):
         self.setCentralWidget(widget)
 
         self.workThread = WorkThread()
-        self.connect( self.workThread, SIGNAL("update(QString)"), self.logHandler )
-        self.logThread = LogThread()
-        self.connect( self.logThread, SIGNAL("update(QString)"), self.fullogHandler )
-        self.logThread.start()
+        self.workThread.update.connect(self.logHandler)
 
         self.BfsThread = BfsThread()
-        self.connect( self.BfsThread, SIGNAL("update(QString)"), self.bfsHandler )
+        self.BfsThread.update.connect(self.bfsHandler)
         self.BfsThread.start()
 
         self.history = json.load(file(os.path.join(CWD, 'history.txt'), 'r'))
         self.logView = QTextBrowser()
         for emblem in os.listdir(os.path.join(CWD, 'emblems')):
-            self.logView.document().addResource(2, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
+            self.logView.document().addResource(2, QUrl("emblems/%s" % emblem),
+                                                QImage("emblems/%s" % emblem))
         self.fullogView = QTextBrowser()
         self.consoleView = QTextBrowser()
         self.consoleView.append(colored('Galio javascript console', '#666'))
@@ -285,12 +323,13 @@ class RTN(QMainWindow):
         self.q = []
         self.q_zfwk = []
         self.consoleThread = ConsoleThread(self.q, self.q_zfwk)
-        self.connect( self.consoleThread, SIGNAL("update(QString, QString)"), self.consoleIOHandler )
-        self.connect( self.consoleThread, SIGNAL("payload(QString)"), self.gslPayload )
+        self.consoleThread.update.connect(self.consoleIOHandler)
+        self.consoleThread.payload.connect(self.gslPayload)
         self.consoleThread.start()
 
         self.notes_widget = QTextEdit()
-        self.notes_widget.setText(file(os.path.join(CWD, "notes.txt"), 'r').read().decode("utf8"))
+        self.notes_widget.setText(
+            file(os.path.join(CWD, "notes.txt"), 'r').read().decode("utf8"))
         self.notes_widget.textChanged.connect(self.saveNotes)
 
         console_widget = QWidget()
@@ -320,7 +359,8 @@ class RTN(QMainWindow):
         self.addDockWidget(Qt.BottomDockWidgetArea, dock)
 
         self.parserView = QWebView()
-        self.parserView.setUrl(QUrl(os.path.join(CWD, 'dc_parser/DCParser.html')))
+        self.parserView.setUrl(
+            QUrl(os.path.join(CWD, 'dc_parser/DCParser.html')))
 
         self.parserViewNG = QWidget()
         self.parserViewNG.setLayout(QVBoxLayout())
@@ -332,7 +372,7 @@ class RTN(QMainWindow):
 
         tabs = QTabWidget()
         tabs.addTab(self.logView, 'Log')
-        tabs.addTab(self.fullogView, 'Full log')
+        # tabs.addTab(self.fullogView, 'Full log')
         tabs.addTab(self.parserView, 'DC Parser')
         tabs.addTab(self.parserViewNG, 'DC Parser NG')
         # tabs.addTab(console_widget, 'JS Console')
@@ -397,8 +437,8 @@ class RTN(QMainWindow):
         self.errors_check.stateChanged.connect(self.errors_toggle)
         bpanel.layout().addWidget(self.errors_check)
 
-
-        bpanel.layout().addSpacerItem(QSpacerItem(20,40,QSizePolicy.Minimum,QSizePolicy.Expanding))
+        bpanel.layout().addSpacerItem(
+            QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
         # self.workThread.start()
 
         QShortcut(QKeySequence("Ctrl+R"), self, self.restartGalio)
@@ -413,15 +453,17 @@ class RTN(QMainWindow):
     def decodeDC(self, *args):
         message = str(self.dcMessageInput.toPlainText())
         d = Decoder(message)
+        self.dcMessageOutput.clear()
+        # if True:
         try:
             d.decode()
+            # print(d.json())
             d.display(show=self.displayDC)
         except Exception as e:
             self.dcMessageOutput.append("Decode error: %s" % e.message)
-            print(e)
+            # print(e)
 
     def displayDC(self, msg):
-        self.dcMessageOutput.clear()
         self.dcMessageOutput.append(msg)
 
     def gslPayload(self, msg):
@@ -429,16 +471,15 @@ class RTN(QMainWindow):
         self.message(colored("Fake GSL recieved:", 'orange', attrs=[""]))
         self.message(colored(msg, 'orange', attrs=["bold"]))
 
-
     def dcFlush(self):
         self.q_zfwk.append('dcFlush()')
-
 
     def stopGalio(self):
         self.workThread.work = False
         stopGalio()
         self.workThread.wait()
-        self.message(colored(" === Emulator stopped === ", 'red', attrs=["bold"], emblem='red'))
+        self.message(colored(
+            " === Emulator stopped === ", 'red', attrs=["bold"], emblem='red'))
 
     def rtn_toggle(self):
         if self.rtnui_check.checkState() == Qt.Checked:
@@ -458,16 +499,12 @@ class RTN(QMainWindow):
         elif 'errors' in rtn_rules.active_rules:
             rtn_rules.active_rules.remove('errors')
 
-
     def saveNotes(self):
         t = self.notes_widget.toPlainText().toUtf8()
         file(os.path.join(CWD, "notes.txt"), 'w').write(t)
 
     def clearLogs(self):
         self.logView.clear()
-        # for emblem in os.listdir(os.path.join(CWD, 'emblems')):
-        #     self.logView.document().addResource(2, QUrl("emblems/%s" % emblem), QImage("emblems/%s" % emblem))
-        # self.fullogView.clear()
 
     def restartApp(self):
         stopGalio()
@@ -487,10 +524,14 @@ class RTN(QMainWindow):
         open(os.path.join(CWD, 'rtn_log.log'), 'w').write("")
 
     def openLog(self):
-        subprocess.Popen(['subl', os.path.join(CWD, 'rtn_log.log')])
+        subprocess.Popen(['glogg', os.path.join(CWD, 'rtn_log.log')])
 
     def openInject(self):
-        subprocess.Popen(['subl', os.path.join(CWD, 'js/rtn_inject.js'), os.path.join(CWD, 'js/rtn_inject_zfwk.js')])
+        subprocess.Popen([
+            'subl',
+            os.path.join(CWD, 'js/rtn_inject.js'),
+            os.path.join(CWD, 'js/rtn_inject_zfwk.js')]
+        )
 
     def consoleInputHandler(self):
         cmd = self.consoleInput.text()
@@ -531,30 +572,34 @@ class RTN(QMainWindow):
             print(msg)
 
     def message(self, msg):
-        if len(msg) > 300:
-            msg = msg[:300] + '...'
+        if len(msg) > 500:
+            msg = msg[:500] + '...'
         self.logView.append(msg)
-        self.logView.verticalScrollBar().setValue(self.logView.verticalScrollBar().maximum())
+        self.logView.verticalScrollBar().setValue(
+            self.logView.verticalScrollBar().maximum())
 
     def fullogHandler(self, msg):
         msg = str(msg).strip()
         self.fullogView.append(msg)
-        self.fullogView.verticalScrollBar().setValue(self.fullogView.verticalScrollBar().maximum())
+        self.fullogView.verticalScrollBar().setValue(
+            self.fullogView.verticalScrollBar().maximum())
 
     def consoleIOHandler(self, msg, fix):
         msg = str(msg).strip()
         if not fix:
             self.consoleView.append(msg)
-            self.consoleView.verticalScrollBar().setValue(self.consoleView.verticalScrollBar().maximum())
+            self.consoleView.verticalScrollBar().setValue(
+                self.consoleView.verticalScrollBar().maximum())
         else:
             self.consoleView2.append(msg)
-            self.consoleView2.verticalScrollBar().setValue(self.consoleView2.verticalScrollBar().maximum())
+            self.consoleView2.verticalScrollBar().setValue(
+                self.consoleView2.verticalScrollBar().maximum())
 
     def clear_restart(self):
         self.clearLogs()
         self.removeLog()
         self.logThread = LogThread()
-        self.connect( self.logThread, SIGNAL("update(QString)"), self.fullogHandler )
+        self.logThread.update.connect(self.fullogHandler)
         self.logThread.start()
         self.restartGalio()
 
@@ -567,9 +612,11 @@ class RTN(QMainWindow):
         self.BfsThread.start()
 
     def startWork(self):
-        self.message(colored(" === Start emulator === ", 'yellow', attrs=["bold"], emblem='yellow'))
+        self.message(colored(
+            " === Start emulator === ", 'yellow',
+            attrs=["bold"], emblem='yellow'))
         self.workThread = WorkThread()
-        self.connect( self.workThread, SIGNAL("update(QString)"), self.logHandler )
+        self.workThread.update.connect(self.logHandler)
         self.workThread.start()
         self.BfsThread.start()
 
@@ -583,12 +630,14 @@ class RTN(QMainWindow):
             pass
 
         if isEmulatorLoaded(log):
-            self.message(colored(" === Emulator loaded === ", 'green', attrs=["bold"], emblem='green'))
+            self.message(colored(
+                " === Emulator loaded === ", 'green',
+                attrs=["bold"], emblem='green'))
             activateEmulator()
         logging.info(log)
 
 
-stopGalio()    
+stopGalio()
 widget = RTN()
 widget.show()
 
@@ -598,5 +647,6 @@ if __name__ == "__main__":
     time.sleep(2)
     widget.workThread.work = False
     widget.workThread.wait()
-    json.dump(map(str, widget.history), file(os.path.join(CWD, 'history.txt'), 'w'))
+    json.dump(
+        map(str, widget.history), file(os.path.join(CWD, 'history.txt'), 'w'))
     sys.exit()

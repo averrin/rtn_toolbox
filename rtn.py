@@ -1,6 +1,5 @@
 # -*- coding: utf8 -*-
-import websocket
-import thread
+import threading as thread
 import time
 import json
 from termcolor import colored
@@ -8,7 +7,7 @@ from termcolor import colored
 import subprocess
 import os, sys
 import logging
-CWD = os.getcwd()
+CWD = os.path.split(sys.argv[0])[0]
 logging.basicConfig(filename=os.path.join(CWD, 'rtn_log.log'), level=logging.DEBUG)
 import time
 import rtn_rules
@@ -46,7 +45,7 @@ def getColored(log, colorfn=colored):
 
 def activateEmulator():
     time.sleep(1)
-    c = "xdotool search 'Cisco Vantage'"                                                                                       
+    c = "xdotool search 'Cisco Vantage'"
     p = subprocess.Popen(["/bin/bash", "-c", c], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     wid = p.communicate()[0].strip()
     subprocess.call(["xdotool", "windowactivate", wid])

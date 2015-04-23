@@ -14,6 +14,7 @@ def encodeInt(number):
 
 class Decoder(object):
 	def __init__(self, msg):
+		msg = msg.replace(' ', '')
 		self.data = [msg[i:i+2] for i in range(0, len(msg), 2)]
 		self.cursor = 0
 		self.message = {}
@@ -81,6 +82,7 @@ class Decoder(object):
 	def readString(self):
 		s = ''
 		l = self.read7bit()
+		i = 0
 		for i in xrange(self.cursor, self.cursor+l):
 			s += chr(int(self.data[i], 16))
 		self.cursor = i + 1
@@ -103,11 +105,48 @@ class Decoder(object):
 			event['type'] = 'mosaic session'
 			cs = self.read7bit()
 			event['callsign'] = self.message['callsigns'][cs]
-			d = self.read7bit()
-			event["duration"] = d
+			event["duration"] = self.read7bit()
 			event['exit_type'] = chr(self.read7bit())
 			event['exit_value'] = self.read7bit()
 			event['banner_code'] = self.read7bit()
+		elif id == 1:
+			event['type'] = 'ace/upsell menu item enter'
+			event["menu_id"] = self.read7bit()
+			event["duration"] = self.read7bit()
+			event['exit_type'] = chr(self.read7bit())
+			event['exit_value'] = self.read7bit()
+			event['banner_code'] = self.read7bit()
+		elif id == 2:
+			event['type'] = 'banner impression'
+			event["source"] = self.read7bit()
+			event["banner_id"] = self.read7bit()
+			event['duration'] = self.read7bit()
+			event['activated'] = self.read7bit()
+		elif id == 3:
+			event['type'] = 'upsell order now'
+			event["menu_id"] = self.read7bit()
+		elif id == 4:
+			event['type'] = 'EBIF app session'
+			event["app"] = self.read7bit()
+			event["duration"] = self.read7bit()
+		elif id == 5:
+			event['type'] = 'searches count'
+			event["count"] = self.read7bit()
+			event["filters"] = self.read7bit()
+		elif id == 6:
+			event['type'] = 'search option activation'
+			event["search_element_code"] = self.read7bit()
+			event["duration"] = self.read7bit()
+			event['exit_type'] = chr(self.read7bit())
+			event['exit_value'] = self.read7bit()
+		elif id == 7:
+			event['type'] = 'upsell from search'
+			event["purchaseValue"] = self.read7bit()
+		elif id == 9:
+			event['type'] = 'VOD Playing/Ordering'
+			event["vod_action"] = self.read7bit()
+			event["vod_asset_id"] = self.read7bit()
+			event['vod_context_id'] = self.read7bit()
 
 		else:
 			raise Exception("Event type not implemented")
@@ -120,11 +159,11 @@ class Decoder(object):
 		show("ver: %(version)s" % m)
 		show("launched services count: %(services_count)s" % m)
 		if m['services']:
-			show("services: %s" % ",".join(m['services']))
+			show("services: %s" % ", ".join(m['services']))
 
 		show("used callsigns count: %(callsigns_count)s" % m)
 		if m['callsigns']:
-			show("callsigns: %s" % ",".join(m['callsigns']))
+			show("callsigns: %s" % ", ".join(m['callsigns']))
 
 		show('package type: %(package_type)s' % m)
 		show('study code: %(study_code)s' % m)
