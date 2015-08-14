@@ -11,7 +11,10 @@ CWD = os.path.split(sys.argv[0])[0]
 logging.basicConfig(filename=os.path.join(CWD, 'rtn_log.log'), level=logging.DEBUG)
 import time
 import rtn_rules
-import ConfigParser
+try:
+    import ConfigParser
+except:
+    import configparser as ConfigParser
 config = ConfigParser.ConfigParser()
 config.read(os.path.join(CWD, 'toolbox.cfg'))
 
@@ -29,6 +32,7 @@ def getAttrs(log):
     if len(ls) == 3:
         prefix, ts, log = ls
         ls = log.split(": ")
+        tag = ''
         if len(ls) >= 2:
             tag = ls[0]
         return prefix[-6:], tag, ": ".join(ls[1:])

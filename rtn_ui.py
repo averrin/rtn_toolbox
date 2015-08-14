@@ -9,9 +9,19 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtWebKitWidgets import QWebView
 from rtn import *
 import subprocess
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-from SocketServer import ThreadingMixIn
-import urlparse
+try:
+    from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+except:
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+try:
+    from SocketServer import ThreadingMixIn
+except:
+    from socketserver import ThreadingMixIn
+try:
+    import urlparse
+except:
+    import urllib.parse as urlparse
+    unicode = str
 import json
 import random
 import binascii
@@ -20,6 +30,7 @@ from de7bit import Decoder, encodeInt
 import base64
 
 CWD = os.path.split(sys.argv[0])[0]
+CWD = os.getcwd()
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -174,11 +185,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def inject(self, fix=''):
         self.send(
-            file(os.path.join(CWD, "js/rtn_inject%s.js" % fix), 'r').read())
+            open(os.path.join(CWD, "js/rtn_inject%s.js" % fix), 'r').read())
         self.msg("Shell injected", fix)
 
     def injectFB(self):
-        self.send(file(os.path.join(CWD, "js/firebug-lite.js"), 'r').read())
+        self.send(open(os.path.join(CWD, "js/firebug-lite.js"), 'r').read())
 
     def fakeSSEEvents(self):
         self.send_response(200)
@@ -304,7 +315,7 @@ class RTN(QMainWindow):
         self.BfsThread.update.connect(self.bfsHandler)
         self.BfsThread.start()
 
-        self.history = json.load(file(os.path.join(CWD, 'history.txt'), 'r'))
+        self.history = json.load(open(os.path.join(CWD, 'history.txt'), 'r'))
         self.logView = QTextBrowser()
         for emblem in os.listdir(os.path.join(CWD, 'emblems')):
             self.logView.document().addResource(2, QUrl("emblems/%s" % emblem),
@@ -329,7 +340,7 @@ class RTN(QMainWindow):
 
         self.notes_widget = QTextEdit()
         self.notes_widget.setText(
-            file(os.path.join(CWD, "notes.txt"), 'r').read().decode("utf8"))
+            open(os.path.join(CWD, "notes.txt"), 'r').read().decode("utf8"))
         self.notes_widget.textChanged.connect(self.saveNotes)
 
         console_widget = QWidget()
@@ -373,7 +384,7 @@ class RTN(QMainWindow):
         tabs = QTabWidget()
         tabs.addTab(self.logView, 'Log')
         # tabs.addTab(self.fullogView, 'Full log')
-        tabs.addTab(self.parserView, 'DC Parser')
+        # tabs.addTab(self.parserView, 'DC Parser')
         tabs.addTab(self.parserViewNG, 'DC Parser NG')
         # tabs.addTab(console_widget, 'JS Console')
 
@@ -404,6 +415,9 @@ class RTN(QMainWindow):
         openinject_button = QPushButton('Edit injects')
         openinject_button.clicked.connect(self.openInject)
 
+        ruler_button = QPushButton('Run ruler')
+        ruler_button.clicked.connect(self.runRuler)
+
         flush_button = QPushButton('DC Flush')
         flush_button.clicked.connect(self.dcFlush)
 
@@ -419,6 +433,7 @@ class RTN(QMainWindow):
         bpanel.layout().addWidget(remove_button)
         bpanel.layout().addWidget(openlog_button)
         bpanel.layout().addWidget(openinject_button)
+        bpanel.layout().addWidget(ruler_button)
         bpanel.layout().addWidget(flush_button)
 
         bpanel.layout().addWidget(QLabel("Log details"))
@@ -501,7 +516,7 @@ class RTN(QMainWindow):
 
     def saveNotes(self):
         t = self.notes_widget.toPlainText().toUtf8()
-        file(os.path.join(CWD, "notes.txt"), 'w').write(t)
+        open(os.path.join(CWD, "notes.txt"), 'w').write(t)
 
     def clearLogs(self):
         self.logView.clear()
@@ -512,7 +527,7 @@ class RTN(QMainWindow):
         os.execl(python, python, * sys.argv)
 
     def editRules(self):
-        subprocess.Popen(['subl', os.path.join(CWD, 'rtn_rules.py')])
+        subprocess.Popen(['atom', os.path.join(CWD, 'rtn_rules.py')])
 
     def reloadRules(self):
         reload(rtn_rules)
@@ -528,10 +543,15 @@ class RTN(QMainWindow):
 
     def openInject(self):
         subprocess.Popen([
-            'subl',
+            'atom',
             os.path.join(CWD, 'js/rtn_inject.js'),
             os.path.join(CWD, 'js/rtn_inject_zfwk.js')]
         )
+
+    def runRuler(self):
+        subprocess.Popen([
+            'kruler',
+        ])
 
     def consoleInputHandler(self):
         cmd = self.consoleInput.text()
@@ -580,6 +600,7 @@ class RTN(QMainWindow):
 
     def fullogHandler(self, msg):
         msg = str(msg).strip()
+        print(msg)
         self.fullogView.append(msg)
         self.fullogView.verticalScrollBar().setValue(
             self.fullogView.verticalScrollBar().maximum())
@@ -599,7 +620,7 @@ class RTN(QMainWindow):
         self.clearLogs()
         self.removeLog()
         self.logThread = LogThread()
-        self.logThread.update.connect(self.fullogHandler)
+        self.logThread.update.connect(self.logHandler)
         self.logThread.start()
         self.restartGalio()
 
@@ -626,8 +647,8 @@ class RTN(QMainWindow):
             msg = getColored(log, colored)
             if msg is not None:
                 self.message(msg)
-        except:
-            pass
+        except Exception as e:
+            print(e)
 
         if isEmulatorLoaded(log):
             self.message(colored(
@@ -648,5 +669,5 @@ if __name__ == "__main__":
     widget.workThread.work = False
     widget.workThread.wait()
     json.dump(
-        map(str, widget.history), file(os.path.join(CWD, 'history.txt'), 'w'))
+        map(str, widget.history), open(os.path.join(CWD, 'history.txt'), 'w'))
     sys.exit()
