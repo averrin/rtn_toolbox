@@ -65,7 +65,7 @@ function dir(name, object) {
 function zsendAnswer(answ){
   var xmlhttp;
   xmlhttp = new XMLHttpRequest();
-  xmlhttp.open("POST", 'http://localhost:8877/answer_zfwk', true);
+  xmlhttp.open("POST", 'http://localhost:8088/answer_zfwk', true);
   xmlhttp.send('answer=' + answ);
 }
 
@@ -99,7 +99,7 @@ function get(url){
 }
 
 function zwaitCmd() {
-  zcallAjax('http://localhost:8877/shell_zfwk?rand=' + Math.random(), function (data) {
+  zcallAjax('http://localhost:8088/shell_zfwk?rand=' + Math.random(), function (data) {
     if (data) {
       log("injected: " + data);
       try {

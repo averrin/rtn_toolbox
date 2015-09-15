@@ -58,7 +58,7 @@ function dir(name, object) {
 function sendAnswer(answ){
   var xmlhttp;
   xmlhttp = new XMLHttpRequest();
-  xmlhttp.open("POST", 'http://localhost:8877/answer', true);
+  xmlhttp.open("POST", 'http://localhost:8088/answer', true);
   xmlhttp.send('answer=' + answ);
 }
 

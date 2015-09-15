@@ -150,7 +150,15 @@ class Decoder(object):
             event["vod_action"] = self.read7bit()
             event["vod_asset_id"] = self.read7bit()
             event['vod_context_id'] = self.read7bit()
-
+        elif id == 10:
+            event['type'] = 'Upsell impressions'
+            event["screen_id"] = self.read7bit()
+            event["entry_point"] = self.read7bit()
+            event["exit_point"] = self.read7bit()
+        elif id == 11:
+            event['type'] = 'Upsell sessions'
+            event["count"] = self.read7bit()
+            event["duration"] = self.read7bit()
         else:
             raise Exception("Event type not implemented")
         return event

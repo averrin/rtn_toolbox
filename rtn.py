@@ -116,6 +116,7 @@ import threading
 
 def startGalio():
     print('Staring Galio...')
+    os.system('killall glogg')
     startEmulator()
 
 def stopGalio():

@@ -152,7 +152,7 @@ class ConsoleThread(QThread):
         while self.consoleServer is None:
             try:
                 self.consoleServer = ThreadedHTTPServer(
-                    ('localhost', 8877), self.consoleHandler)
+                    ('localhost', 8088), self.consoleHandler)
             except Exception as e:
                 sys.stdout.write('    ' + spinner.next().encode("utf8") + ws)
                 sys.stdout.flush()
@@ -169,6 +169,8 @@ def handleRequestsUsing(parent):
     return lambda *args: Handler(parent, *args)
 
 
+SSE_APPS = []
+SSE_APPS_inited = []
 class Handler(BaseHTTPRequestHandler):
     def __init__(self, parent, *args):
         self.parent = parent
@@ -191,23 +193,42 @@ class Handler(BaseHTTPRequestHandler):
     def injectFB(self):
         self.send(open(os.path.join(CWD, "js/firebug-lite.js"), 'r').read())
 
+    def createEvent(self, event_type, headers, msg=''):
+        event = "id: %s\n" % random.randint(0, 9999)
+        event += "event:%s\n" % event_type
+        for key, value in headers:
+            event += "data:%s=%s\n" % (key, value)
+        if msg:
+            data = msg
+            data = base64.b64encode(data) + '\n'
+            event += "data: %s" % data
+        return event
+
     def fakeSSEEvents(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
-        event = "id: %s\n" % random.randint(0, 9999)
-        for i in xrange(4):
-            msg = "from toolbox"
-            flags = 3
-            mac = "74d435"
-            msg_type = 2
-            msg_id = 'AB'
-            info = 'C'
-            l = len(msg) + 1
-            data = encodeInt(flags) + mac + \
-                encodeInt(l) + encodeInt(msg_type) + msg
-            data = base64.b64encode(data) + '\n'
-            event += "data: %s" % data
+        o = urlparse.urlparse(self.path)
+        args = urlparse.parse_qs(o.query)
+        app_name = args['application'][0]
+        headers = [('service', 'GSLEmulator')]
+        if app_name not in SSE_APPS:
+            event_type = "service-online"
+            msg = ''
+        else:
+            if app_name not in SSE_APPS_inited:
+                event_type = "client-connect"
+                headers.append(('connection', random.randint(0, 999)))
+                headers.append(('ip', '127.0.0.1'))
+                headers.append(('port', '7890'))
+                msg = ''
+                SSE_APPS_inited.append(app_name)
+            else:
+                event_type = "remoteServiceEvent"
+                headers.append(('ip', '127.0.0.1'))
+                headers.append(('port', '7890'))
+                msg = "Event data from gsl emulator"
+        event = self.createEvent(event_type, headers, msg)
         if config.getboolean('logging', 'LOG_SSE'):
             print(event)
         self.wfile.write(event)
@@ -219,7 +240,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.path.startswith('/initUDPService'):
             self.send_response(200)
             self.end_headers()
-            self.wfile.write('Goot')
+            self.wfile.write('GSLEmulator')
             return
 
         if self.path.startswith('/SSEEvents'):
@@ -242,17 +263,31 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def do_POST(self):
-
         length = int(self.headers['Content-Length'])
         answer = urlparse.parse_qs(self.rfile.read(length).decode('utf-8'))
         if self.path.startswith('/initProxyClient') or \
-            self.path.startswith('/remoteServiceEvent') or \
             self.path.startswith('/initTCPServer') or \
                 self.path.startswith('/initUDPService'):
             print(answer)
             self.send_response(200)
             self.end_headers()
-            self.wfile.write('Goot')
+            self.wfile.write('GSLEmulator')
+            return
+        if self.path.startswith('/remoteServiceEventCancel') or self.path.startswith('/finalize'):
+            app_name = answer['application'][0]
+            if app_name in SSE_APPS:
+                SSE_APPS.remove(app_name)
+            if app_name in SSE_APPS_inited:
+                SSE_APPS_inited.remove(app_name)
+            print(SSE_APPS, SSE_APPS_inited)
+            self.send_response(200)
+            self.end_headers()
+        if self.path.startswith('/remoteServiceEvent'):
+            app_name = answer['application'][0]
+            if app not in SSE_APPS:
+                SSE_APPS.append(app_name)
+            self.send_response(200)
+            self.end_headers()
             return
         if self.path.startswith('/applicationID'):
             print(answer)
@@ -260,7 +295,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(answer['name'][0])
-            except Exceprion as e:
+            except Exception as e:
                 print(e)
                 self.send_response(200)
                 self.end_headers()
@@ -279,7 +314,7 @@ class Handler(BaseHTTPRequestHandler):
             print(e.message)
             print(self.path, answer)
 
-        if self.path == '/sendRequest':
+        if self.path == '/sendRequest' or self.path == '/sendUDP':
             print(answer['payload'])
             pl = answer['payload'][0][16:]
             if len(pl) % 4 != 0:  # check if multiple of 4
@@ -383,9 +418,13 @@ class RTN(QMainWindow):
 
         tabs = QTabWidget()
         tabs.addTab(self.logView, 'Log')
+        shortcutT1 = QShortcut(QKeySequence("Alt+1"), self)
+        shortcutT1.activated.connect(lambda: tabs.setCurrentIndex(0))
         # tabs.addTab(self.fullogView, 'Full log')
         # tabs.addTab(self.parserView, 'DC Parser')
         tabs.addTab(self.parserViewNG, 'DC Parser NG')
+        shortcutT2 = QShortcut(QKeySequence("Alt+2"), self)
+        shortcutT2.activated.connect(lambda: tabs.setCurrentIndex(1))
         # tabs.addTab(console_widget, 'JS Console')
 
         start_button = QPushButton('Start')
@@ -394,6 +433,10 @@ class RTN(QMainWindow):
         restart_button.clicked.connect(self.restartGalio)
         crestart_button = QPushButton('Clear && Restart')
         crestart_button.clicked.connect(self.clear_restart)
+
+        shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        shortcut.activated.connect(self.clear_restart)
+
         stop_button = QPushButton('Stop')
         stop_button.clicked.connect(self.stopGalio)
         widget.setLayout(QHBoxLayout())
@@ -412,6 +455,9 @@ class RTN(QMainWindow):
         remove_button.clicked.connect(self.removeLog)
         openlog_button = QPushButton('Open log')
         openlog_button.clicked.connect(self.openLog)
+        shortcut3 = QShortcut(QKeySequence("Ctrl+l"), self)
+        shortcut3.activated.connect(self.openLog)
+
         openinject_button = QPushButton('Edit injects')
         openinject_button.clicked.connect(self.openInject)
 
@@ -420,6 +466,9 @@ class RTN(QMainWindow):
 
         flush_button = QPushButton('DC Flush')
         flush_button.clicked.connect(self.dcFlush)
+
+        shortcut2 = QShortcut(QKeySequence("Ctrl+F"), self)
+        shortcut2.activated.connect(self.dcFlush)
 
         bpanel.layout().addWidget(QLabel("Galio controls"))
         bpanel.layout().addWidget(start_button)
@@ -485,6 +534,8 @@ class RTN(QMainWindow):
         msg = str(msg)
         self.message(colored("Fake GSL recieved:", 'orange', attrs=[""]))
         self.message(colored(msg, 'orange', attrs=["bold"]))
+        self.dcMessageInput.setText(msg)
+        self.decodeDC()
 
     def dcFlush(self):
         self.q_zfwk.append('dcFlush()')
@@ -629,6 +680,7 @@ class RTN(QMainWindow):
         self.consoleView.clear()
         stopGalio()
         time.sleep(2)
+        self.workThread.work = False
         self.startWork()
         self.BfsThread.start()
 
@@ -642,13 +694,19 @@ class RTN(QMainWindow):
         self.BfsThread.start()
 
     def logHandler(self, message):
-        log = str(message).strip()
+        try:
+            log = str(message).strip()
+        except:
+            self.workThread.work = False
+            self.workThread = None
+            return
         try:
             msg = getColored(log, colored)
             if msg is not None:
                 self.message(msg)
         except Exception as e:
             print(e)
+            return
 
         if isEmulatorLoaded(log):
             self.message(colored(
