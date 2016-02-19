@@ -92,6 +92,7 @@ class Decoder(object):
         return s
 
     def readEvent(self, id, td):
+        print(id)
         event = {"id": id, 'timedelta': td}
         if id == 8:
             event['type'] = 'channel tune'
@@ -159,8 +160,14 @@ class Decoder(object):
             event['type'] = 'Upsell sessions'
             event["count"] = self.read7bit()
             event["duration"] = self.read7bit()
+        elif id == 12:
+            event['type'] = 'Upsell purchases'
+            event["purchase_value"] = self.readString()
+            event["discount"] = self.readString()
+            event["putchase_type"] = self.read7bit()
         else:
-            raise Exception("Event type not implemented")
+            return event
+            # raise Exception("Event type not implemented")
         return event
 
     def display(self, show=print):
@@ -190,3 +197,9 @@ class Decoder(object):
         msg['start_timestamp_formatted'] = str(
             msg['start_timestamp_formatted'])
         return json.dumps(msg, indent=indent)
+
+if __name__ == '__main__':
+    import sys
+    decoder = Decoder(sys.argv[1])
+    decoder.decode()
+    decoder.display()

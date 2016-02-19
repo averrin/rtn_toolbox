@@ -316,7 +316,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == '/sendRequest' or self.path == '/sendUDP':
             print(answer['payload'])
-            pl = answer['payload'][0][16:]
+            pl = answer['payload'][0][16:].strip()
             if len(pl) % 4 != 0:  # check if multiple of 4
                 while len(pl) % 4 != 0:
                     pl = pl + "="
@@ -724,8 +724,9 @@ if __name__ == "__main__":
     app.exec_()
     stopGalio()
     time.sleep(2)
-    widget.workThread.work = False
-    widget.workThread.wait()
+    if widget.workThread is not None:
+        widget.workThread.work = False
+        widget.workThread.wait()
     json.dump(
         map(str, widget.history), open(os.path.join(CWD, 'history.txt'), 'w'))
     sys.exit()

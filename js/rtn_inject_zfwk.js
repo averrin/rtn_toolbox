@@ -8,6 +8,7 @@ function log(msg) {
 
 function dcFlush(){
   zfwk.Service.DataCollector.flush(true);
+  zfwk.Service.DataCollector.sendEvents();
 }
 
 function restart(){
